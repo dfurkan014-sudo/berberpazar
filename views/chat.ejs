@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sohbet</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+<h2><%= other.name %> <%= other.surname %> ile sohbet</h2>
+<ul id="messages">
+<% messages.forEach(m => { %>
+<li><%= m.from_user === user.id ? 'Ben' : other.name %>: <%= m.content %></li>
+<% }) %>
+</ul>
+<form id="form">
+<input id="input" autocomplete="off" /><button>Gönder</button>
+</form>
+<script>
+var socket = io();
+var form = document.getElementById('form');
+var input = document.getElementById('input');
+form.addEventListener('submit', function(e) {
+  e.preventDefault();
+  if (input.value) {
+    socket.emit('chat message', { from: <%= user.id %>, to: <%= other.id %>, content: input.value });
+    input.value = '';
+  }
+});
+socket.on('chat message', function(msg) {
+  if ((msg.from === <%= user.id %> && msg.to === <%= other.id %>) || (msg.from === <%= other.id %> && msg.to === <%= user.id %>)) {
+    var item = document.createElement('li');
+    item.textContent = (msg.from === <%= user.id %> ? 'Ben' : '<%= other.name %>') + ': ' + msg.content;
+    document.getElementById('messages').appendChild(item);
+  }
+});
+</script>
+</body>
+</html>
