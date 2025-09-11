@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Chats</h2>
+<ul>
+  {% for chat in chats %}
+    {% with other=chat.participants.exclude(id=request.user.id).first %}
+      <li><a href="/chat/{{ other.id }}/">Chat with {{ other.username }}</a></li>
+    {% endwith %}
+  {% empty %}
+  <li>No chats yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

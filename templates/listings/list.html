@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Listings</h2>
+<ul>
+  {% for item in listings %}
+  <li>{{ item.title }} - {{ item.price }} by {{ item.owner.username }} <a href="/chat/{{ item.owner.id }}/">Chat</a></li>
+  {% empty %}
+  <li>No listings yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
