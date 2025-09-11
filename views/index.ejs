@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Berber Pazar</title></head>
+<body>
+<% if (user) { %>
+<p>Merhaba <%= user.name %> <a href="/products/new">Yeni İlan</a></p>
+<% } else { %>
+<p><a href="/login">Giriş</a> | <a href="/register">Kayıt Ol</a></p>
+<% } %>
+<h2>İlanlar</h2>
+<ul>
+<% products.forEach(p => { %>
+<li><strong><%= p.title %></strong> - <%= p.description %> (<%= p.name %> <%= p.surname %>) <% if (user && p.user_id !== user.id) { %><a href="/chat/<%= p.user_id %>">Sohbet</a><% } %></li>
+<% }) %>
+</ul>
+</body>
+</html>
