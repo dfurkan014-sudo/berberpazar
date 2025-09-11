@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Listings</h1>
+<ul>
+{% for listing in listings %}
+    <li>
+        <strong>{{ listing.title }}</strong> by {{ listing.user.first_name }} {{ listing.user.last_name }}<br>
+        {{ listing.description }}<br>
+        {% if current_user.is_authenticated and current_user.id != listing.user.id %}
+            <a href="{{ url_for('chat', user_id=listing.user.id) }}">Chat with seller</a>
+        {% endif %}
+    </li>
+{% endfor %}
+</ul>
+{% endblock %}

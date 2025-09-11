@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>New Listing</h1>
+<form method="post">
+    <label>Title:<input type="text" name="title" required></label><br>
+    <label>Description:<br><textarea name="description" required></textarea></label><br>
+    <button type="submit">Create</button>
+</form>
+{% endblock %}
