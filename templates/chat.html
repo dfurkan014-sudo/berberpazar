@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Chat with {{ other.first_name }} {{ other.last_name }}</h1>
+<ul>
+{% for msg in messages %}
+    <li><strong>{{ 'You' if msg.sender_id == current_user.id else other.first_name }}:</strong> {{ msg.content }} ({{ msg.timestamp.strftime('%Y-%m-%d %H:%M') }})</li>
+{% endfor %}
+</ul>
+<form method="post">
+    <input type="text" name="content" required>
+    <button type="submit">Send</button>
+</form>
+{% endblock %}
