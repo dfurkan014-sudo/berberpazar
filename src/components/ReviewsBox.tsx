@@ -42,23 +42,33 @@ export default function ReviewsBox({ listingId }: { listingId: number }) {
 
   React.useEffect(() => { load(); }, [load]);
 
-  async function submit() {
+ async function submit() {
+  if (!rating) { alert('Lütfen 1-5 arası bir puan seç.'); return; }
+  try {
     const r = await fetch(`/api/listings/${listingId}/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rating, comment }),
     });
+
     if (r.status === 401) { window.location.href = "/login"; return; }
+    if (r.status === 429) {
+      const d = await r.json().catch(() => ({}));
+      alert(d?.error || "Çok sık istek. Birkaç saniye sonra tekrar deneyin.");
+      return;
+    }
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert(d?.error || "Kaydetme sırasında bir hata oluştu.");
+      return;
+    }
+
     const d = await r.json();
     if (d?.ok) load();
+  } catch {
+    alert("Bağlantı hatası. Lütfen internetinizi kontrol edin.");
   }
-
-  async function removeMine() {
-    const r = await fetch(`/api/listings/${listingId}/reviews`, { method: "DELETE" });
-    if (r.status === 401) { window.location.href = "/login"; return; }
-    const d = await r.json();
-    if (d?.ok) { setRating(0); setComment(""); load(); }
-  }
+}
 
   return (
     <section className="mt-10">
