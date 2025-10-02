@@ -4,12 +4,42 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 
+/* ——— Yardımcı sabitler ——— */
+const DEVICE_TYPES = [
+  { value: 'SAC_KESME_MAKINESI', label: 'Saç kesme makinesi' },
+  { value: 'TRAS_MAKINESI',      label: 'Tıraş makinesi' },
+  { value: 'SAKAL_DUZELTICI',    label: 'Sakal düzeltici' },
+  { value: 'FON_MAKINESI',       label: 'Fön makinesi' },
+  { value: 'MAKAS',              label: 'Makas' },
+  { value: 'JILET',              label: 'Jilet' },
+  { value: 'DIGER',              label: 'Diğer' },
+] as const;
+
+const BRANDS = [
+  'Wahl','Andis','Babyliss','Moser','Philips','Remington','Panasonic',
+  'Braun','Rowenta','Xiaomi','JRL','Kemei',
+];
+
+const CITIES = [
+  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Aksaray','Amasya','Ankara','Antalya','Ardahan','Artvin',
+  'Aydın','Balıkesir','Bartın','Batman','Bayburt','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa',
+  'Çanakkale','Çankırı','Çorum','Denizli','Diyarbakır','Düzce','Edirne','Elazığ','Erzincan','Erzurum',
+  'Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkâri','Hatay','Iğdır','Isparta','İstanbul','İzmir',
+  'Kahramanmaraş','Karabük','Karaman','Kars','Kastamonu','Kayseri','Kırıkkale','Kırklareli','Kırşehir',
+  'Kilis','Kocaeli','Konya','Kütahya','Malatya','Manisa','Mardin','Mersin','Muğla','Muş','Nevşehir',
+  'Niğde','Ordu','Osmaniye','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas','Şanlıurfa','Şırnak',
+  'Tekirdağ','Tokat','Trabzon','Tunceli','Uşak','Van','Yalova','Yozgat','Zonguldak',
+];
+
 type Listing = {
   id: number;
   title: string;
   description: string | null;
-  price: string;      // API string döndürüyor
+  price: string;        // API string döndürüyor
   images: string[];
+  brand: string | null;
+  city:  string | null;
+  deviceType: string | null;
 };
 
 export default function EditListingPage() {
@@ -24,8 +54,18 @@ export default function EditListingPage() {
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState<string>('');
   const [description, setDescription] = useState('');
-  const [imagesText, setImagesText] = useState('');   // virgüllü alan
-  const [uploaded, setUploaded] = useState<string[]>([]); // önizleme
+  const [imagesText, setImagesText] = useState('');
+  const [uploaded, setUploaded] = useState<string[]>([]);
+
+  // yeni alanlar
+  const [brand, setBrand] = useState('');
+  const [city, setCity] = useState('');
+  const [deviceType, setDeviceType] = useState<string>('');
+
+  // şehir için küçük bir otomatik tamamlama listesi (ilk 8 öneri)
+  const citySuggestions = CITIES.filter(c =>
+    c.toLocaleLowerCase('tr').includes(city.toLocaleLowerCase('tr'))
+  ).slice(0, 8);
 
   useEffect(() => {
     let active = true;
@@ -45,6 +85,10 @@ export default function EditListingPage() {
           : [];
         setImagesText(imgs.join(', '));
         setUploaded(imgs);
+
+        setBrand(data.brand ?? '');
+        setCity(data.city ?? '');
+        setDeviceType(data.deviceType ?? '');
       } catch (e: any) {
         setStatus(`Hata: ${e?.message ?? String(e)}`);
       } finally {
@@ -96,6 +140,7 @@ export default function EditListingPage() {
     setStatus(null);
     try {
       const images = imagesText.split(',').map(s => s.trim()).filter(Boolean);
+
       const res = await fetch(`/api/listings/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -104,13 +149,17 @@ export default function EditListingPage() {
           description: description || null,
           price,
           images,
+          // yeni alanlar:
+          brand: brand || null,
+          city: city || null,
+          deviceType: deviceType || null,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? res.statusText);
 
       setStatus('✔️ Güncellendi');
-      setTimeout(() => router.push(`/listings/${id}`), 800);
+      setTimeout(() => router.push(`/listings/${id}`), 700);
     } catch (e: any) {
       setStatus(`Hata: ${e?.message ?? String(e)}`);
     } finally {
@@ -140,16 +189,60 @@ export default function EditListingPage() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm mb-1">Fiyat (₺)</label>
-          <input
-            className="w-full border rounded p-2"
-            type="number"
-            step="0.01"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            required
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm mb-1">Fiyat (₺)</label>
+            <input
+              className="w-full border rounded p-2"
+              type="number"
+              step="0.01"
+              value={price}
+              onChange={e => setPrice(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Marka</label>
+            <input
+              list="brand-list"
+              className="w-full border rounded p-2"
+              value={brand}
+              onChange={e => setBrand(e.target.value)}
+              placeholder="Örn: Philips"
+            />
+            <datalist id="brand-list">
+              {BRANDS.map(b => <option key={b} value={b} />)}
+            </datalist>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Şehir</label>
+            <input
+              className="w-full border rounded p-2"
+              value={city}
+              onChange={e => setCity(e.target.value)}
+              placeholder="Şehir girin"
+              list="city-list"
+            />
+            <datalist id="city-list">
+              {citySuggestions.map(c => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Tür</label>
+            <select
+              className="w-full border rounded p-2 bg-transparent"
+              value={deviceType}
+              onChange={e => setDeviceType(e.target.value)}
+            >
+              <option value="">Seçiniz</option>
+              {DEVICE_TYPES.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div>

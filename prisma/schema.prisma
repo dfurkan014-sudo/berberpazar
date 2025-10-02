@@ -8,27 +8,135 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/**
+ * --------- Enumlar ---------
+ */
+enum DeviceType {
+  SAC_KESME_MAKINESI
+  TRAS_MAKINESI
+  SAKAL_DUZELTICI
+  FON_MAKINESI
+  MAKAS
+  JILET
+  DIGER
+}
+
+/**
+ * --------- Modeller ---------
+ */
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  name      String?
-  // İleride şifreli giriş eklersek:
+  id           Int     @id @default(autoincrement())
+  email        String  @unique
+  name         String?
   passwordHash String?
 
-  listings  Listing[]
+  // Profil
+  phone          String? @unique
+  secondaryEmail String? @unique
+  city           String?
+  avatarUrl      String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  // İlişkiler
+  listings  Listing[]
+  favorites Favorite[]
+
+  // Satıcı (kullanıcı) yorumları
+  reviewsAboutMe SellerReview[] @relation("ReviewsAboutSeller")
+  reviewsIWrote  SellerReview[] @relation("ReviewsByUser")
+
+  // İlan (ürün) yorumlarını YAZDIĞIM (author)
+  listingReviews ListingReview[] @relation("ListingReviewsByAuthor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([city])
 }
 
 model Listing {
-  id         Int      @id @default(autoincrement())
-  title      String
+  id          Int     @id @default(autoincrement())
+  title       String
   description String?
-  price      Decimal  @db.Decimal(10,2)
-  images     Json                  // @default([]) KALDIRILDI
+  price       Decimal @db.Decimal(10, 2)
+  images      Json
+
+  // Filtre alanları
+  brand      String?
+  city       String?
+  deviceType DeviceType?
+
+  sellerId Int
+  seller   User @relation(fields: [sellerId], references: [id])
+
+  // Favoriler
+  favoritedBy Favorite[]
+
+  // Ürün yorumları
+  reviews ListingReview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([brand])
+  @@index([city])
+  @@index([deviceType])
+  @@index([createdAt])
+  @@index([price])
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  listingId Int
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
+/**
+ * --------- Satıcı (kullanıcı) yorumları ---------
+ */
+model SellerReview {
+  id         Int      @id @default(autoincrement())
   sellerId   Int
-  seller     User     @relation(fields: [sellerId], references: [id])
+  reviewerId Int
+  rating     Int
+  comment    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  seller   User @relation("ReviewsAboutSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  reviewer User @relation("ReviewsByUser", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, reviewerId]) // aynı kullanıcı aynı satıcıyı 1 kez
+  @@index([sellerId])
+  @@index([reviewerId])
+  @@index([createdAt])
+}
+
+/**
+ * --------- İlan (ürün) yorumları ---------
+ */
+model ListingReview {
+  id        Int      @id @default(autoincrement())
+  listingId Int
+  authorId  Int // yorumu yazan kullanıcı
+  rating    Int // 1..5 (uygulamada doğruluyoruz)
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  author  User    @relation("ListingReviewsByAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([authorId, listingId]) // bir kullanıcı bir ilanı 1 kez oylasın (upsert için)
+  @@index([listingId])
+  @@index([authorId])
+  @@index([createdAt])
 }

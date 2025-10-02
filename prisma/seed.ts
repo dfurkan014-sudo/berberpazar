@@ -12,31 +12,50 @@ const demoImages = [
 ];
 
 async function main() {
-  // 1) Kullanıcıları oluştur / güncelle (role alanı YOK)
+  // Aynı hash'i create ve update için kullan
+  const hash1 = await bcrypt.hash('123456', 10);
+  const hash2 = await bcrypt.hash('123456', 10);
+
+  // (İsteğe bağlı) passwordHash'i boş olan eski kayıtları düzelt
+  await prisma.user.updateMany({
+    where: { passwordHash: null },
+    data: { passwordHash: hash1 },
+  });
+
+  // 1) Kullanıcıları oluştur / güncelle
   const users = await Promise.all([
     prisma.user.upsert({
       where: { email: 'furkan@example.com' },
-      update: {},
+      update: {
+        name: 'Furkan',
+        passwordHash: hash1, // ← var olan kullanıcıda da şifreyi set et
+      },
       create: {
         email: 'furkan@example.com',
         name: 'Furkan',
-        passwordHash: await bcrypt.hash('123456', 10),
+        passwordHash: hash1,
       },
     }),
     prisma.user.upsert({
       where: { email: 'demo@example.com' },
-      update: {},
+      update: {
+        name: 'Demo Kullanıcı',
+        passwordHash: hash2, // ← var olan kullanıcıda da şifreyi set et
+      },
       create: {
         email: 'demo@example.com',
         name: 'Demo Kullanıcı',
-        passwordHash: await bcrypt.hash('123456', 10),
+        passwordHash: hash2,
       },
     }),
   ]);
 
   const sellerId = users[0].id;
 
-  // 2) İlanlar (precision yerine fractionDigits kullanıyoruz)
+  // (Opsiyonel) Aynı seller'ın eski ilanlarını temizlemek istersen:
+  // await prisma.listing.deleteMany({ where: { sellerId } });
+
+  // 2) İlanlar
   const listingsData = Array.from({ length: 15 }).map(() => {
     const priceNum = faker.number.float({ min: 150, max: 7500, fractionDigits: 2 });
     const price = priceNum.toFixed(2); // Prisma Decimal'e string vermek güvenli
