@@ -3,6 +3,7 @@ import { prisma } from "src/app/lib/prisma";
 import { getCurrentUser } from "src/app/lib/authServer";
 import BarberDecor from "src/components/BarberDecor";
 
+
 /* ---------------- helpers ---------------- */
 function fmtTRY(v: any) {
   const n =
@@ -69,7 +70,7 @@ export default async function HomePage() {
         <section className="relative overflow-hidden border-b border-zinc-800 bg-gradient-to-b from-zinc-950 to-black">
           <div
             className="absolute inset-0 opacity-20"
-            style={bg("https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?q=80&w=1600&auto=format&fit=crop")}
+            style={bg("yaziyazi.png")}
             aria-hidden
           />
           <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-20">

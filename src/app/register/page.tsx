@@ -112,7 +112,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl p-6">
+    <div className="auth-screen py-12">
+      
       <h1 className="text-2xl font-semibold mb-6">Kayıt ol</h1>
 
       {error && (

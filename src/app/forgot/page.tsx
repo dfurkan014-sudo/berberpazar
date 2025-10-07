@@ -36,7 +36,7 @@ export default function ForgotPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto p-6">
+   <div className="auth-screen py-12">
       <h1 className="text-2xl font-semibold mb-4">Şifremi Unuttum</h1>
 
       {err && (
