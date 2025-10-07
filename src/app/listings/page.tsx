@@ -209,20 +209,20 @@ export default async function ListingsIndex({
 
   return (
     <div className="relative page-listing">
-      {/* --- ARKA PLAN: solda yoğun görsel, koyu overlay ile --- */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
-        {/* Görsel */}
-        {/* md ekranlarda biraz daha merkeze al; sayfa uzunken parallax için fixed */}
-        <img
-          src={BG_URL}
-          alt=""
-          className="w-full h-full object-cover object-left md:object-center opacity-25 md:opacity-30"
-        />
-        {/* Karanlık/okunurluk için degrade maske */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/80" />
-        {/* Kenarlara hafif vignette; kartları öne çıkarır */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.6)_100%)]" />
-      </div>
+ {/* --- ARKA PLAN: solda yoğun görsel, koyu overlay ile --- */}
+<div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+  {/* Görsel */}
+  <img
+    src={BG_URL}
+    alt=""
+    className="w-full h-full object-cover object-left md:object-center
+               opacity-70 md:opacity-80 brightness-110 contrast-110"
+  />
+  {/* Karanlık/okunurluk için degrade maske (biraz hafiflettik) */}
+  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/25 to-black/50" />
+  {/* Vignette’i de yumuşattık */}
+  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_75%,rgba(0,0,0,0.35)_100%)]" />
+</div>
 
       {/* İçerik */}
       <div className="page-listings max-w-6xl mx-auto p-6 space-y-6">
