@@ -1,3 +1,4 @@
+// src/app/listings/new/page.tsx
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
@@ -13,8 +14,7 @@ function PageBg() {
       <img
         src={BG_URL}
         alt=""
-        className="w-full h-full object-cover object-center
-                   opacity-80 brightness-115 contrast-110"
+        className="w-full h-full object-cover object-center opacity-80 brightness-115 contrast-110"
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/40" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_75%,rgba(0,0,0,0.35)_100%)]" />
@@ -56,6 +56,41 @@ function normTr(s: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ı/g, 'i');
+}
+function slugTr(s: string) {
+  return (s || '')
+    .trim()
+    .toLocaleLowerCase('tr')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ş]/g, 's').replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g')
+    .replace(/[ü]/g, 'u').replace(/[ö]/g, 'o').replace(/[ı]/g, 'i')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+function deviceLabelFromValue(v?: string | null) {
+  switch (v) {
+    case 'SAC_KESME_MAKINESI': return 'Saç kesme makinesi';
+    case 'TRAS_MAKINESI':      return 'Tıraş makinesi';
+    case 'SAKAL_DUZELTICI':    return 'Sakal düzeltici';
+    case 'FON_MAKINESI':       return 'Fön makinesi';
+    case 'MAKAS':              return 'Makas';
+    case 'JILET':              return 'Jilet';
+    case 'DIGER':              return 'Diğer';
+    default:                   return '';
+  }
+}
+
+/* —— URL yardımcıları (VİRGÜLSÜZ!) —— */
+const URL_REGEX = /https?:\/\/[^\s'"]+/g;
+const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
+function extractUrls(s: string): string[] {
+  return uniq((s.match(URL_REGEX) || []).map(u => u.trim()));
+}
+function joinUrls(urls: string[]): string {
+  // metin alanında her url ayrı satır: virgül YOK
+  return urls.join('\n');
 }
 
 /* Öneri inputu (marka/şehir) */
@@ -226,7 +261,7 @@ export default function NewListingPage() {
   const [description, setDescription] = useState('');
 
   // görseller
-  const [imagesText, setImagesText] = useState('');   // virgülle ayrılmış url’ler
+  const [imagesText, setImagesText] = useState('');   // çoklu URL: satır satır
   const [uploaded, setUploaded] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -243,6 +278,47 @@ export default function NewListingPage() {
   const [status, setStatus] = useState<string | null>(null);
 
   const isCityValid = !city || TR_CITIES.some(c => normTr(c) === normTr(city));
+
+  /* —— SEO yardımcıları —— */
+  function buildImageAlt() {
+    const parts = [
+      brand || '',
+      deviceLabelFromValue(deviceType) || '',
+      title || '',
+      city ? `(${city})` : '',
+      'berber ekipmanı',
+    ].filter(Boolean);
+    return parts.join(' ').replace(/\s+/g, ' ').trim();
+  }
+  function buildImageCaption() {
+    const parts = [
+      title || '',
+      brand || '',
+      deviceLabelFromValue(deviceType) || '',
+      city || '',
+    ].filter(Boolean);
+    const cap = parts.join(' · ');
+    return cap || 'Berber ekipmanı';
+  }
+  function buildImageTags() {
+    const base = [
+      'berber','kuaför','berber ekipmanları','berber malzemeleri',
+      'tıraş','sakal','saç','makine','aksesuar',
+      'ikinci el','2. el','ikinciel','sıfır','0',
+      'barber','barbershop','hair','clipper','trimmer'
+    ];
+    const dyn = [
+      brand, deviceLabelFromValue(deviceType), city,
+      ...title.split(/\s+/).slice(0,5)
+    ].filter(Boolean);
+    const uniqTags = uniq([...dyn, ...base].map(t => t.toString().toLowerCase()));
+    return uniqTags.slice(0, 18);
+  }
+  function buildPublicId(originalName: string) {
+    const ext = (originalName.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
+    const stem = slugTr([brand, deviceLabelFromValue(deviceType), title].filter(Boolean).join('-')) || 'berberpazar';
+    return `${stem}-${Date.now()}.${ext}`;
+  }
 
   /* ——— Upload ——— */
   async function handleUpload(files: FileList | null) {
@@ -261,21 +337,31 @@ export default function NewListingPage() {
           throw new Error('Max 8MB dosya yüklenebilir.');
         }
 
+        const alt = buildImageAlt();
+        const caption = buildImageCaption();
+        const tags = buildImageTags();
+        const publicId = buildPublicId(file.name);
+
         const fd = new FormData();
         fd.append('file', file);
+        fd.append('alt', alt);
+        fd.append('caption', caption);
+        fd.append('tags', JSON.stringify(tags));
+        fd.append('publicId', publicId);
 
         const res = await fetch('/api/upload', { method: 'POST', body: fd });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error ?? res.statusText);
-        newUrls.push(String(data.url));
+
+        const url = typeof data === 'string'
+          ? data
+          : (Array.isArray(data) ? data[0] : (data?.url || data?.urls?.[0]));
+        if (!url) throw new Error('Yüklenen görsel URL’i alınamadı.');
+        newUrls.push(String(url));
       }
 
-      setImagesText(prev => {
-        const prevArr = prev.split(',').map(s => s.trim()).filter(Boolean);
-        const merged = Array.from(new Set([...prevArr, ...newUrls]));
-        return merged.join(', ');
-      });
-      setUploaded(prev => Array.from(new Set([...prev, ...newUrls])));
+      setUploaded(prev => uniq([...prev, ...newUrls]));
+      setImagesText(prev => joinUrls(uniq([...extractUrls(prev), ...newUrls])));
 
       setStatus(`✔️ ${newUrls.length} görsel yüklendi`);
     } catch (e: any) {
@@ -287,13 +373,7 @@ export default function NewListingPage() {
 
   function removeImage(url: string) {
     setUploaded(prev => prev.filter(u => u !== url));
-    setImagesText(prev =>
-      prev
-        .split(',')
-        .map(s => s.trim())
-        .filter(u => u && u !== url)
-        .join(', ')
-    );
+    setImagesText(prev => joinUrls(extractUrls(prev).filter(u => u !== url)));
   }
 
   /* ——— Submit ——— */
@@ -309,14 +389,9 @@ export default function NewListingPage() {
       }
       const priceString = priceNumber.toFixed(2);
 
-      const images = Array.from(
-        new Set(
-          imagesText
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean)
-        )
-      );
+      // ARTIK VİRGÜL YOK — metin alanından URL’leri regex ile çekiyoruz
+      const textUrls = extractUrls(imagesText);
+      const images = uniq([...uploaded, ...textUrls]);
 
       const canonicalCity = TR_CITIES.find(c => normTr(c) === normTr(city)) || city.trim() || null;
 
@@ -349,6 +424,8 @@ export default function NewListingPage() {
       setLoading(false);
     }
   }
+
+  const previewAlt = buildImageAlt();
 
   return (
     <>
@@ -433,7 +510,7 @@ export default function NewListingPage() {
               {uploaded.map(url => (
                 <div key={url} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-24 object-cover rounded" />
+                  <img src={url} alt={previewAlt} title={buildImageCaption()} className="w-full h-24 object-cover rounded" />
                   <button
                     type="button"
                     onClick={() => removeImage(url)}
@@ -448,14 +525,18 @@ export default function NewListingPage() {
 
           <div>
             <label className="block text-sm mb-1">
-              Görsel URL’leri (virgülle ayır) — yükledikleriniz otomatik eklenir
+              Görsel URL’leri (opsiyonel)
             </label>
-            <input
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2"
+            {/* URL’ler artık satır satır; virgül KULLANMAYIN */}
+            <textarea
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 min-h-[96px]"
               value={imagesText}
               onChange={e => setImagesText(e.target.value)}
-              placeholder="https://..., https://..."
+              placeholder={`Her URL'i ayrı satıra yazın veya yapıştırın.\nÖrn:\nhttps://res.cloudinary.com/.../image/upload/f_auto,q_auto/...jpg\nhttps://.../ikinci-url.webp`}
             />
+            <p className="mt-1 text-xs text-zinc-500">
+              İpucu: Virgül kullanmayın. URL’ler satır satır veya boşlukla ayrılabilir.
+            </p>
           </div>
 
           <div>

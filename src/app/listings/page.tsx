@@ -23,7 +23,6 @@ function fmtTRY(v: any) {
 function splitCsv(s: string) {
   return s.split(',').map(x => x.trim()).filter(Boolean);
 }
-// TR-normalizasyon (filtre eşlemesi için)
 function normTr(s: string) {
   return s
     .toLocaleUpperCase('tr')
@@ -39,7 +38,6 @@ function normTr(s: string) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-// Etiket → enum eşlemesi (filtre için)
 const DEVICE_MAP_FOR_FILTER: Record<string, DeviceType> = {
   'SAC KESME MAKINESI': 'SAC_KESME_MAKINESI',
   'TRAS MAKINESI': 'TRAS_MAKINESI',
@@ -51,7 +49,6 @@ const DEVICE_MAP_FOR_FILTER: Record<string, DeviceType> = {
   'DIGER': 'DIGER',
   'YEDEK BICAK': 'DIGER',
 };
-// Enum → okunur etiket (rozet için)
 function deviceLabel(dt: DeviceType | null | undefined) {
   switch (dt) {
     case 'SAC_KESME_MAKINESI': return 'Saç kesme makinesi';
@@ -72,7 +69,7 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ---------- SSR yıldız + rozet (inline stil; CSS beklemez) ---------- */
+/* ---------- SSR yıldız + rozet ---------- */
 function SSRStars({ value, size = 14 }: { value: number; size?: number }) {
   const full = Math.round(value);
   return (
@@ -107,7 +104,7 @@ type SearchParams = {
   q?: string;
   page?: string;
   brands?: string;
-  models?: string;   // “Sakal düzeltici,Fön makinesi” gibi
+  models?: string;
   city?: string;
   min?: string;
   max?: string;
@@ -116,7 +113,6 @@ type SearchParams = {
 
 /* ---------- sayfa ---------- */
 export default async function ListingsIndex({
-  // Next.js 15: searchParams bir Promise
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
@@ -126,12 +122,10 @@ export default async function ListingsIndex({
   const q = (sp.q ?? '').trim();
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
 
-  // URL → filtreler
   const brandsArr = splitCsv(sp.brands ?? '');
   const modelsArr = splitCsv(sp.models ?? '');
   const city = (sp.city ?? '').trim();
 
-  // Fiyat aralığı
   const minRaw = String(sp.min ?? '').replace(',', '.').trim();
   const maxRaw = String(sp.max ?? '').replace(',', '.').trim();
   const min = Number.parseFloat(minRaw);
@@ -139,12 +133,10 @@ export default async function ListingsIndex({
   const hasMin = Number.isFinite(min);
   const hasMax = Number.isFinite(max);
 
-  // Model etiketlerini enum stringlerine çevir (normalize ederek)
   const deviceTypes: DeviceType[] = modelsArr
     .map((m) => DEVICE_MAP_FOR_FILTER[normTr(m)] ?? null)
     .filter((v): v is DeviceType => Boolean(v));
 
-  // Prisma where
   const where: Prisma.ListingWhereInput = {
     ...(q ? { OR: [{ title: { contains: q } }, { description: { contains: q } }] } : {}),
     ...(brandsArr.length ? { brand: { in: brandsArr } } : {}),
@@ -155,24 +147,21 @@ export default async function ListingsIndex({
       : {}),
   };
 
-  // Sıralama
   const sort = (sp.sort ?? 'newest') as SearchParams['sort'];
   const orderBy: Prisma.ListingOrderByWithRelationInput =
     sort === 'price_asc'  ? { price: 'asc' }  :
     sort === 'price_desc' ? { price: 'desc' } :
     sort === 'oldest'     ? { createdAt: 'asc' } :
-                            { createdAt: 'desc' }; // default newest
+                            { createdAt: 'desc' };
 
   const take = 12;
   const skip = (page - 1) * take;
 
-  // 1) sayfanın ilanlarını çek
   const rows = await prisma.listing.findMany({
     where, orderBy, take, skip,
     include: { seller: { select: { name: true } } },
   });
 
-  // 2) bu sayfadaki ilanların puan/yorum istatistiklerini TEK sorguda al
   const ids = rows.map(r => r.id);
   const [ total, grouped ] = await Promise.all([
     prisma.listing.count({ where }),
@@ -209,20 +198,17 @@ export default async function ListingsIndex({
 
   return (
     <div className="relative page-listing">
- {/* --- ARKA PLAN: solda yoğun görsel, koyu overlay ile --- */}
-<div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
-  {/* Görsel */}
-  <img
-    src={BG_URL}
-    alt=""
-    className="w-full h-full object-cover object-left md:object-center
-               opacity-70 md:opacity-80 brightness-110 contrast-110"
-  />
-  {/* Karanlık/okunurluk için degrade maske (biraz hafiflettik) */}
-  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/25 to-black/50" />
-  {/* Vignette’i de yumuşattık */}
-  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_75%,rgba(0,0,0,0.35)_100%)]" />
-</div>
+      {/* --- ARKA PLAN + overlay --- */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <img
+          src={BG_URL}
+          alt=""
+          className="w-full h-full object-cover object-left md:object-center
+                     opacity-70 md:opacity-80 brightness-110 contrast-110"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/25 to-black/50" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_75%,rgba(0,0,0,0.35)_100%)]" />
+      </div>
 
       {/* İçerik */}
       <div className="page-listings max-w-6xl mx-auto p-6 space-y-6">
@@ -234,10 +220,8 @@ export default async function ListingsIndex({
         </div>
 
         <div className="flex gap-6">
-          {/* Sol: Filtre paneli (client) */}
           <Filters />
 
-          {/* Sağ: arama, aktif filtreler, kartlar */}
           <div className="flex-1 space-y-4">
             <form method="GET" className="flex gap-2">
               <input
@@ -249,10 +233,8 @@ export default async function ListingsIndex({
               <button className="px-3 py-2 rounded border">Ara</button>
             </form>
 
-            {/* Aktif filtre rozetleri */}
             <ActiveFilters />
 
-            {/* Sonuçlar */}
             {rows.length === 0 ? (
               <p className="text-sm text-gray-200">
                 Kayıt bulunamadı{q ? ` (arama: "${q}")` : ''}.
@@ -266,7 +248,6 @@ export default async function ListingsIndex({
                   const cover = images[0] ?? null;
                   const typeLabel = deviceLabel(it.deviceType as DeviceType | null);
 
-                  // bu karta ait istatistik (SSR)
                   const st = statsMap.get(it.id) ?? { average: 0, count: 0 };
 
                   return (
@@ -276,11 +257,14 @@ export default async function ListingsIndex({
                       className="border rounded-lg overflow-hidden hover:shadow transition bg-white/80 dark:bg-zinc-900/70 backdrop-blur"
                     >
                       <div className="aspect-video bg-gray-100 flex items-center justify-center relative">
-                        {/* SSR ROZET (resmin ÜSTÜNDE, anında görünür) */}
                         <SSRReviewBadgeSmall average={st.average} count={st.count} />
                         {cover ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={cover} alt={it.title} className="w-full h-full object-cover" />
+                          <img
+                            src={cover}
+                            alt={`${it.title}${it.brand ? ' - ' + it.brand : ''}${typeLabel ? ' - ' + typeLabel : ''}`}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <span className="text-gray-500 text-sm">Görsel yok</span>
                         )}
@@ -290,7 +274,6 @@ export default async function ListingsIndex({
                         <div className="font-medium line-clamp-1">{it.title}</div>
                         <div className="text-sm text-gray-700 dark:text-gray-300">{fmtTRY(it.price)}</div>
 
-                        {/* rozetler */}
                         <div className="mt-2 flex flex-wrap">
                           {it.brand && <Badge>Marka: {it.brand}</Badge>}
                           {it.city && <Badge>Şehir: {it.city}</Badge>}
@@ -307,7 +290,6 @@ export default async function ListingsIndex({
               </div>
             )}
 
-            {/* Sayfalama */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 pt-2">
                 <Link
@@ -335,3 +317,4 @@ export default async function ListingsIndex({
     </div>
   );
 }
+// EoF

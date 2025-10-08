@@ -100,6 +100,9 @@ export default function ProfilePage() {
   // Öneri aç/kapat
   const [cityOpen, setCityOpen] = useState(false);
 
+  // Avatar upload durumu
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   const presets = useMemo(
     () => presetAvatars(form?.name || form?.email || 'berberpazar'),
     [form?.name, form?.email]
@@ -157,29 +160,52 @@ export default function ProfilePage() {
     setCityOpen(false);
   }
 
+  /* ---------------- Avatar Upload (düzeltilmiş) ---------------- */
   async function onUploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
-    setError(null); setOk(null);
+
+    setError(null);
+    setOk(null);
+
+    // Tip / boyut doğrulama
+    if (!/^image\/(jpeg|jpg|png|webp|gif)$/.test(file.type)) {
+      setError('Sadece JPEG/PNG/WebP/GIF yükleyin.');
+      input.value = '';
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError('Maksimum 8MB dosya yüklenebilir.');
+      input.value = '';
+      return;
+    }
+
+    setAvatarUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const r = await fetch('/api/upload', { method: 'POST', body: fd });
-      if (!r.ok) throw new Error('Yükleme başarısız');
-      const json = await r.json();
-      const url =
-        (Array.isArray(json) && json[0]) ||
-        json?.url ||
-        json?.urls?.[0] || null;
-      if (!url) throw new Error('URL alınamadı');
+      // Alt metin/bağlam ekleyelim (isteğe bağlı)
+      const who = form?.name || form?.email || 'kullanıcı';
+      fd.append('alt', `${who} avatar`);
+      const res = await fetch('/api/upload?scope=avatar', { method: 'POST', body: fd });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || res.statusText);
+
+      // API { url } döndürüyor; fallback olarak secure_url alanını da deneriz
+      const url: string | undefined = json?.url || json?.secure_url || json?.original_secure_url;
+      if (!url) throw new Error('Upload yanıtında URL bulunamadı.');
+
       onChange('avatarUrl', url);
-      setOk('Avatar yüklendi.');
-    } catch (e: any) {
-      setError(e?.message || 'Yükleme hatası');
+      setOk('Avatar yüklendi. Profilinizi güncellemek için “Kaydet”e basın.');
+    } catch (err: any) {
+      setError(err?.message || 'Yükleme hatası.');
     } finally {
-      (e.target as HTMLInputElement).value = '';
+      input.value = '';
+      setAvatarUploading(false);
     }
   }
+  /* -------------------------------------------------------------- */
 
   async function onSubmitProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -199,7 +225,7 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name ?? '',
-          city: form.city ? (canonicalCity || '') : '', // kanoniğe oturt
+          city: form.city ? (canonicalCity || '') : '',
           phone: form.phone ?? '',
           secondaryEmail: form.secondaryEmail ?? '',
           avatarUrl: form.avatarUrl ?? '',
@@ -305,8 +331,12 @@ export default function ProfilePage() {
                 type="file"
                 accept="image/*"
                 onChange={onUploadAvatar}
-                className="block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-zinc-600 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-sm file:text-zinc-100"
+                disabled={avatarUploading}
+                className="block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-zinc-600 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-sm file:text-zinc-100 disabled:opacity-60"
               />
+              {avatarUploading && (
+                <div className="mt-1 text-xs text-zinc-400">Yükleniyor…</div>
+              )}
             </div>
 
             <div className="mt-4">

@@ -1,3 +1,4 @@
+// src/app/page.tsx
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { prisma } from "src/app/lib/prisma";
@@ -60,8 +61,28 @@ export default async function HomePage() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+  // --- SEO: WebSite JSON-LD (SearchAction) ---
+  const webSiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    url: appUrl,
+    name: "BerberPazar",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${appUrl}/listings?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <>
+      {/* JSON-LD */}
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
+      />
+
       {/* Her zaman üstte dönen direkler (amblem yok) */}
       <BarberDecor />
 
@@ -69,9 +90,9 @@ export default async function HomePage() {
         {/* HERO */}
         <section className="relative overflow-hidden border-b border-zinc-800 bg-gradient-to-b from-zinc-950 to-black">
           <div
-           className="absolute inset-0 opacity-70 filter brightness-110 contrast-110"
-  style={{ ...bg("/barberdene.png"), backgroundPosition: "center 80%" }}
-  aria-hidden
+            className="absolute inset-0 opacity-70 filter brightness-110 contrast-110"
+            style={{ ...bg("/barberdene.png"), backgroundPosition: "center 80%" }}
+            aria-hidden
           />
           <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-20">
             <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
@@ -111,51 +132,50 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
-{/* KATEGORİLER */}
-<section className="mx-auto max-w-6xl px-4 py-10">
-  <div className="mb-4 flex items-end justify-between">
-    <h2 className="text-xl sm:text-2xl font-semibold">Kategoriler</h2>
-    <Link href="/listings" className="text-sm text-zinc-400 hover:underline">Hepsini görüntüle</Link>
-  </div>
 
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-    {categories.map((c) => (
-      <Link
-        key={c.key}
-        href={{ pathname: "/listings", query: { models: c.label } }}  // <<— DEĞİŞTİ
-        className="group rounded-2xl border border-zinc-800 bg-zinc-950 p-4 hover:border-zinc-700"
-        aria-label={`${c.label} ilanlarını gör`}
-      >
-        <div className="text-2xl">{c.emoji}</div>
-        <div className="mt-2 text-sm font-medium">{c.label}</div>
-        <div className="text-xs text-zinc-500 group-hover:text-zinc-400">İlanları gör</div>
-      </Link>
-    ))}
-  </div>
-</section>
+        {/* KATEGORİLER */}
+        <section className="mx-auto max-w-6xl px-4 py-10">
+          <div className="mb-4 flex items-end justify-between">
+            <h2 className="text-xl sm:text-2xl font-semibold">Kategoriler</h2>
+            <Link href="/listings" className="text-sm text-zinc-400 hover:underline">Hepsini görüntüle</Link>
+          </div>
 
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {categories.map((c) => (
+              <Link
+                key={c.key}
+                href={{ pathname: "/listings", query: { models: c.label } }}  // <<— filtreyle uyumlu
+                className="group rounded-2xl border border-zinc-800 bg-zinc-950 p-4 hover:border-zinc-700"
+                aria-label={`${c.label} ilanlarını gör`}
+              >
+                <div className="text-2xl">{c.emoji}</div>
+                <div className="mt-2 text-sm font-medium">{c.label}</div>
+                <div className="text-xs text-zinc-500 group-hover:text-zinc-400">İlanları gör</div>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-{/* TREND MARKALAR */}
-{brandAgg.length > 0 && (
-  <section className="mx-auto max-w-6xl px-4 pb-4">
-    <div className="mb-4 flex items-end justify-between">
-      <h2 className="text-xl sm:text-2xl font-semibold">Trend markalar</h2>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      {brandAgg.map((b) => (
-        <Link
-          key={b.brand ?? "unknown"}
-          href={{ pathname: "/listings", query: { brands: b.brand ?? "" } }}  // <<— DEĞİŞTİ
-          className="rounded-full border border-zinc-700 px-3 py-1 text-sm hover:bg-zinc-900"
-          aria-label={`${b.brand ?? "Diğer"} ilanları`}
-        >
-          {(b.brand ?? "Diğer")} <span className="opacity-60">· {b._count.brand}</span>
-        </Link>
-      ))}
-    </div>
-  </section>
-)}
-
+        {/* TREND MARKALAR */}
+        {brandAgg.length > 0 && (
+          <section className="mx-auto max-w-6xl px-4 pb-4">
+            <div className="mb-4 flex items-end justify-between">
+              <h2 className="text-xl sm:text-2xl font-semibold">Trend markalar</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {brandAgg.map((b) => (
+                <Link
+                  key={b.brand ?? "unknown"}
+                  href={{ pathname: "/listings", query: { brands: b.brand ?? "" } }}  // <<— filtreyle uyumlu
+                  className="rounded-full border border-zinc-700 px-3 py-1 text-sm hover:bg-zinc-900"
+                  aria-label={`${b.brand ?? "Diğer"} ilanları`}
+                >
+                  {(b.brand ?? "Diğer")} <span className="opacity-60">· {b._count.brand}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* YENİ DÜŞENLER */}
         <section className="mx-auto max-w-6xl px-4 py-8">
@@ -167,18 +187,29 @@ export default async function HomePage() {
           <div className="flex gap-4 overflow-x-auto pb-2">
             {newest.map((l) => {
               const img = firstImage(l.images);
+              const alt = `${l.title}${(l as any).brand ? " - " + (l as any).brand : ""}`;
               return (
                 <Link
                   key={l.id}
                   href={`/listings/${l.id}`}
                   className="w-64 shrink-0 rounded-2xl border border-zinc-800 bg-zinc-950 hover:border-zinc-700"
                 >
-                  <div className="aspect-[4/3] rounded-t-2xl bg-zinc-900" style={bg(img || undefined)} />
+                  <div className="aspect-[4/3] rounded-t-2xl bg-zinc-900 relative overflow-hidden">
+                    {img && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={img}
+                        alt={alt}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
                   <div className="p-3">
                     <div className="line-clamp-1 font-medium">{l.title}</div>
                     <div className="text-sm text-zinc-400">{fmtTRY(l.price)}</div>
                     <div className="mt-2 text-xs text-zinc-500 line-clamp-1">
-                      {l.seller?.name || l.seller?.email}
+                      {(l as any).seller?.name || (l as any).seller?.email}
                     </div>
                   </div>
                 </Link>

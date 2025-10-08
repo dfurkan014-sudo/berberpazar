@@ -1,5 +1,6 @@
 // src/app/listings/[id]/page.tsx
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from 'src/app/lib/prisma';
 import { getCurrentUser } from 'src/app/lib/authServer';
@@ -45,6 +46,18 @@ function waHref(phone?: string | null, text?: string) {
 function avatarOf(name: string | null, email: string) {
   const seed = encodeURIComponent(name || email || 'berberpazar');
   return `https://source.boringavatars.com/beam/80/${seed}?square=true`;
+}
+function deviceTypeLabel(dt?: string | null) {
+  switch (dt) {
+    case 'SAC_KESME_MAKINESI': return 'Saç kesme makinesi';
+    case 'TRAS_MAKINESI':      return 'Tıraş makinesi';
+    case 'SAKAL_DUZELTICI':    return 'Sakal düzeltici';
+    case 'FON_MAKINESI':       return 'Fön makinesi';
+    case 'MAKAS':              return 'Makas';
+    case 'JILET':              return 'Jilet';
+    case 'DIGER':              return 'Diğer';
+    default:                   return null;
+  }
 }
 
 /* ---------- SSR yıldız + rozet (inline stil) ---------- */
@@ -95,6 +108,90 @@ function SSRReviewBadge({
       <span style={{ opacity: 0.7 }}>({count})</span>
     </span>
   );
+}
+
+/* ---------- generateMetadata (dinamik SEO) ---------- */
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await params;
+  const nid = Number(id);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+  if (!Number.isFinite(nid)) {
+    return {
+      title: 'İlan bulunamadı | BerberPazar',
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const row = await prisma.listing.findUnique({
+    where: { id: nid },
+    select: {
+      title: true,
+      description: true,
+      images: true,
+      brand: true,
+      deviceType: true,
+      city: true,
+      price: true,
+      id: true,
+    },
+  });
+
+  if (!row) {
+    return {
+      title: 'İlan bulunamadı | BerberPazar',
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const images: string[] = Array.isArray(row.images)
+    ? (row.images as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    : [];
+
+  const dtLabel = deviceTypeLabel(row.deviceType);
+  const prettyPrice = fmtTRY(row.price);
+  const title = `${row.title} | ${row.brand ? row.brand + ' | ' : ''}BerberPazar`;
+  const desc =
+    (row.description && row.description.trim().slice(0, 180)) ||
+    [row.brand, dtLabel, row.city, prettyPrice].filter(Boolean).join(' · ');
+
+  const url = `${appUrl}/listings/${row.id}`;
+
+  return {
+    title,
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      url,
+      siteName: 'BerberPazar',
+      locale: 'tr_TR',
+      title,
+      description: desc,
+      images: images.length
+        ? images.map((u) => ({ url: u }))
+        : [{ url: `${appUrl}/og-default.png` }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: desc,
+      images: images.length ? images : [`${appUrl}/og-default.png`],
+    },
+    robots: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+    keywords: [
+      'berber', 'kuaför', 'ikinci el', '2. el', 'sıfır', 'berber ekipmanları',
+      row.brand || '', dtLabel || '', row.city || '', row.title,
+    ].filter(Boolean),
+  };
 }
 
 /* ---------- page ---------- */
@@ -187,7 +284,38 @@ export default async function ListingDetail({
           },
         }
       : {}),
+    // Satıcı bilgisi (varsa)
+    ...(row.seller?.name || row.seller?.email
+      ? {
+          seller: {
+            '@type': 'Person',
+            name: row.seller?.name || row.seller?.email,
+          }
+        }
+      : {}),
   };
+
+  // ---- SEO: BreadcrumbList JSON-LD ----
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'İlanlar',
+        item: `${appUrl}/listings`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: row.title,
+        item: `${appUrl}/listings/${row.id}`,
+      },
+    ],
+  };
+
+  const dtLabel = deviceTypeLabel(row.deviceType);
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -197,13 +325,18 @@ export default async function ListingDetail({
         // @ts-ignore
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <script
+        type="application/ld+json"
+        // @ts-ignore
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
 
       {/* üst bar */}
       <div className="flex items-center justify-between">
         <div className="text-sm space-x-2">
           <Link href="/listings" className="underline opacity-80">ilanlar</Link>
           <span className="opacity-60">/</span>
-          <span className="opacity-80">{row.title.slice(0, 40)}</span>
+          <span className="opacity-80">{row.title.slice(0, 60)}</span>
         </div>
 
         <FavoriteButton listingId={row.id} initialFavorite={initialFavorite} />
@@ -216,9 +349,39 @@ export default async function ListingDetail({
         <div className="text-lg">{fmtTRY(row.price)}</div>
 
         <div className="text-sm text-gray-600 space-x-3">
-          {row.brand && <span>Marka: <b>{row.brand}</b></span>}
-          {row.city && <span>Şehir: <b>{row.city}</b></span>}
-          {row.deviceType && <span>Tür: <b>{row.deviceType}</b></span>}
+          {row.brand && (
+            <span>
+              Marka:{' '}
+              <Link
+                href={{ pathname: '/listings', query: { brands: row.brand } }}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                <b>{row.brand}</b>
+              </Link>
+            </span>
+          )}
+          {row.city && (
+            <span>
+              Şehir:{' '}
+              <Link
+                href={{ pathname: '/listings', query: { city: row.city } }}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                <b>{row.city}</b>
+              </Link>
+            </span>
+          )}
+          {dtLabel && (
+            <span>
+              Tür:{' '}
+              <Link
+                href={{ pathname: '/listings', query: { models: dtLabel } }}
+                className="underline underline-offset-2 hover:opacity-80"
+              >
+                <b>{dtLabel}</b>
+              </Link>
+            </span>
+          )}
         </div>
 
         {row.description && (
@@ -226,7 +389,7 @@ export default async function ListingDetail({
         )}
       </div>
 
-      {/* galeri (artık aşağıda) */}
+      {/* galeri */}
       <Gallery images={images} alt={row.title} />
 
       {/* satıcı kartı */}
